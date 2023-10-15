@@ -3,13 +3,7 @@ import {
   generatePrivateKey,
   getPublicKey,
   getEventHash,
-  getSignature,
 } from "nostr-tools";
-
-// Hardcoding for now until we get everything working and then we will switch to browser extension signed events.
-
-let sk = generatePrivateKey(); // `sk` is a hex string
-let pk = getPublicKey(sk); // `pk` is a hex string
 
 export const connectToRelay = async () => {
   const relay = relayInit("wss://relay.damus.io");
@@ -27,28 +21,26 @@ export const connectToRelay = async () => {
 
 export const publishEvent = async (event) => {
   const relay = await connectToRelay();
-
-  let pub = relay.publish(event);
-  pub.on("ok", () => {
+  try {
+    await relay.publish(event);
+  } catch (err) {
+    console.log(`failed to publish to ${relay.url}: ${err}`);
+    return false;
+  } finally {
     console.log(`${relay.url} has accepted our event`);
     return true;
-  });
-  pub.on("failed", (reason) => {
-    console.log(`failed to publish to ${relay.url}: ${reason}`);
-    return false;
-  });
+  }
 };
 
 export const closeConnectionToRelay = async (relay) => {
   await relay.close();
+  console.log('close connection to relay');
 };
 
 // Forums
 export let createForum = async ({ subject, description }) => {
   console.log("Creating forum");
-
   let event = {
-    pubkey: pk,
     created_at: Math.floor(Date.now() / 1000),
     kind: 10,
     tags: [
@@ -58,10 +50,9 @@ export let createForum = async ({ subject, description }) => {
     content: "",
   };
 
-  event.id = getEventHash(event);
-  event.sig = getSignature(event, sk);
+  const signedEvent = await window.nostr.signEvent(event);
   console.log("Publishing event");
-  await publishEvent(event);
+  event = await publishEvent(signedEvent);
   console.log("Event published");
 
   return event.id;
@@ -92,7 +83,6 @@ export let createThread = async ({
   content,
 }) => {
   let event = {
-    pubkey: pk,
     created_at: Math.floor(Date.now() / 1000),
     kind: 11,
     tags: [
@@ -103,9 +93,8 @@ export let createThread = async ({
     content: content,
   };
 
-  event.id = getEventHash(event);
-  event.sig = getSignature(event, sk);
-  await publishEvent(event);
+  const signedEvent = await window.nostr.signEvent(event);
+  event = await publishEvent(signedEvent);
 
   return event.id;
 };
@@ -132,16 +121,14 @@ export const getThreadDetail = async (threadId) => {
 // Comments
 export let createComment = async ({ threadId, content }) => {
   let event = {
-    pubkey: pk,
     created_at: Math.floor(Date.now() / 1000),
     kind: 12,
     tags: [["e", threadId]],
     content: content,
   };
 
-  event.id = getEventHash(event);
-  event.sig = getSignature(event, sk);
-  await publishEvent(event);
+  const signedEvent = await window.nostr.signEvent(event);
+  event = await publishEvent(signedEvent);
 
   return event.id;
 };
