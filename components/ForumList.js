@@ -37,7 +37,7 @@ const ForumList = async () => {
           console.log("Forum in the map function: ", forum);
           return (
 
-            
+
             <Forum
               subject={forum.tags[0][1]}
               description={forum.tags[1][1]}
